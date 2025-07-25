@@ -1,43 +1,72 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>Map Example</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <title>Map Viewer</title>
+  <style>
+    #map {
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
-  <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-  </style>
 </head>
 <body>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([44.8167, 20.4667], 13);
+    // Получаем city_id из URL
+    const params = new URLSearchParams(window.location.search);
+    const cityId = params.get("city_id");
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
+    if (!cityId) {
+      alert("No city_id provided in URL");
+      throw new Error("Missing city_id");
+    }
+
+    // Создаем карту (пока центрируем временно)
+    const map = L.map("map").setView([0, 0], 13);
+
+    // Подключаем тайлы (OpenStreetMap)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "Map data © OpenStreetMap contributors"
     }).addTo(map);
 
-    // Пример маркеров
-    const places = [
-      { id: 1, name: 'Kalemegdan', coords: [44.8231, 20.4500] },
-      { id: 2, name: 'Republic Square', coords: [44.8167, 20.4600] }
-    ];
+    // Загружаем точки по city_id
+    fetch(`https://xsu8-fybw-zqnb.e2.xano.io/api:GPLlnBSg/places?city_id=${cityId}`)
+      .then(response => {
+        if (!response.ok) throw new Error("Ошибка запроса к Xano");
+        return response.json();
+      })
+      .then(data => {
+        if (!Array.isArray(data)) throw new Error("Некорректный ответ от API");
 
-    places.forEach(place => {
-      const marker = L.marker(place.coords).addTo(map);
-      marker.bindPopup(place.name);
-      marker.on('click', () => {
-        if (window.ReactNativeWebView) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ placeId: place.id }));
+        if (data.length === 0) {
+          alert("Нет точек для выбранного города.");
+          return;
         }
+
+        // Центрируем карту по первой точке
+        const first = data[0];
+        map.setView([first.latitude, first.longitude], 13);
+
+        // Добавляем маркеры
+        data.forEach(place => {
+          if (place.latitude && place.longitude) {
+            L.marker([place.latitude, place.longitude])
+              .addTo(map)
+              .bindPopup(place.name || "Unnamed Place");
+          }
+        });
+      })
+      .catch(error => {
+        console.error("Ошибка загрузки точек:", error);
+        alert("Не удалось загрузить точки.");
       });
-    });
   </script>
 </body>
 </html>
