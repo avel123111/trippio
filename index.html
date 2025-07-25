@@ -8,6 +8,41 @@
       width: 100vw;
       height: 100vh;
     }
+    #modal {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+      padding: 16px;
+      display: none;
+      z-index: 999;
+    }
+    #modal img {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    #modal h2 {
+      margin: 0 0 12px 0;
+    }
+    #modal button {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      padding: 10px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    #modal button:last-child {
+      background: #999;
+    }
   </style>
   <link
     rel="stylesheet"
@@ -16,27 +51,50 @@
 </head>
 <body>
   <div id="map"></div>
+  <div id="modal">
+    <img id="modal-img" src="" alt="Image">
+    <h2 id="modal-title">Place Name</h2>
+    <button id="btn-directions">Get directions</button>
+    <button id="btn-tickets">Tickets</button>
+    <button id="btn-details">Details</button>
+    <button onclick="closeModal()">Close</button>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Получаем city_id из URL
     const params = new URLSearchParams(window.location.search);
     const cityId = params.get("city_id");
-
     if (!cityId) {
       alert("No city_id provided in URL");
       throw new Error("Missing city_id");
     }
 
-    // Создаем карту (пока центрируем временно)
     const map = L.map("map").setView([0, 0], 13);
-
-    // Подключаем тайлы (OpenStreetMap)
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "Map data © OpenStreetMap contributors"
     }).addTo(map);
 
-    // Загружаем точки по city_id
+    const modal = document.getElementById("modal");
+    const modalImg = document.getElementById("modal-img");
+    const modalTitle = document.getElementById("modal-title");
+    const btnDirections = document.getElementById("btn-directions");
+    const btnTickets = document.getElementById("btn-tickets");
+    const btnDetails = document.getElementById("btn-details");
+
+    function showModal(place) {
+      modalImg.src = place.img_url || "";
+      modalTitle.textContent = place.name || "Unnamed";
+      btnTickets.onclick = () => window.open(place.ticket_link, "_blank");
+      btnDetails.onclick = () => window.location.href = `draftbit://PlaceDetailsScreen/${place.id}`;
+      // directions пока пустая
+      btnDirections.onclick = () => alert("Directions not implemented");
+      modal.style.display = "block";
+    }
+
+    function closeModal() {
+      modal.style.display = "none";
+    }
+
     fetch(`https://xsu8-fybw-zqnb.e2.xano.io/api:GPLlnBSg/places?city_id=${cityId}`)
       .then(response => {
         if (!response.ok) throw new Error("Ошибка запроса к Xano");
@@ -44,22 +102,19 @@
       })
       .then(data => {
         if (!Array.isArray(data)) throw new Error("Некорректный ответ от API");
-
         if (data.length === 0) {
           alert("Нет точек для выбранного города.");
           return;
         }
 
-        // Центрируем карту по первой точке
         const first = data[0];
         map.setView([first.latitude, first.longitude], 13);
 
-        // Добавляем маркеры
         data.forEach(place => {
           if (place.latitude && place.longitude) {
             L.marker([place.latitude, place.longitude])
               .addTo(map)
-              .bindPopup(place.name || "Unnamed Place");
+              .on("click", () => showModal(place));
           }
         });
       })
