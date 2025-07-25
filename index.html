@@ -70,7 +70,7 @@
     <button id="btn-directions">Get directions</button>
     <button id="btn-tickets">Tickets</button>
     <button id="btn-details">Details</button>
-    <button onclick="closeModal()">Close</button>
+    <button id="btn-close">Close</button>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -94,13 +94,14 @@
     const btnDirections = document.getElementById("btn-directions");
     const btnTickets = document.getElementById("btn-tickets");
     const btnDetails = document.getElementById("btn-details");
+    const btnClose = document.getElementById("btn-close");
 
     function showModal(place) {
-      modalImg.src = place.img_url || "";
-      modalTitle.textContent = place.name || "Unnamed";
+      modalImg.src = place.Img_URL || "";
+      modalTitle.textContent = place.Name || "Unnamed";
       btnTickets.onclick = () => {
-        if (place.ticket_link) {
-          window.open(place.ticket_link, "_blank");
+        if (place.Ticket_link) {
+          window.open(place.Ticket_link, "_blank");
         } else {
           alert("No ticket link available.");
         }
@@ -118,9 +119,9 @@
       modal.style.display = "block";
     }
 
-    function closeModal() {
+    btnClose.onclick = () => {
       modal.style.display = "none";
-    }
+    };
 
     fetch(`https://xsu8-fybw-zqnb.e2.xano.io/api:GPLlnBSg/places?city_id=${cityId}`)
       .then(response => {
