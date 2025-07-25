@@ -1,9 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>Map Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
     #map {
       width: 100vw;
       height: 100vh;
@@ -19,15 +27,18 @@
       box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
       padding: 16px;
       display: none;
-      z-index: 999;
+      z-index: 9999;
     }
     #modal img {
       width: 100%;
       border-radius: 8px;
       margin-bottom: 12px;
+      max-height: 200px;
+      object-fit: cover;
     }
     #modal h2 {
       margin: 0 0 12px 0;
+      font-size: 18px;
     }
     #modal button {
       display: block;
@@ -39,6 +50,7 @@
       color: white;
       border-radius: 6px;
       font-size: 16px;
+      cursor: pointer;
     }
     #modal button:last-child {
       background: #999;
@@ -51,6 +63,7 @@
 </head>
 <body>
   <div id="map"></div>
+
   <div id="modal">
     <img id="modal-img" src="" alt="Image">
     <h2 id="modal-title">Place Name</h2>
@@ -64,6 +77,7 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const cityId = params.get("city_id");
+
     if (!cityId) {
       alert("No city_id provided in URL");
       throw new Error("Missing city_id");
@@ -84,10 +98,23 @@
     function showModal(place) {
       modalImg.src = place.img_url || "";
       modalTitle.textContent = place.name || "Unnamed";
-      btnTickets.onclick = () => window.open(place.ticket_link, "_blank");
-      btnDetails.onclick = () => window.location.href = `draftbit://PlaceDetailsScreen/${place.id}`;
-      // directions пока пустая
-      btnDirections.onclick = () => alert("Directions not implemented");
+      btnTickets.onclick = () => {
+        if (place.ticket_link) {
+          window.open(place.ticket_link, "_blank");
+        } else {
+          alert("No ticket link available.");
+        }
+      };
+      btnDetails.onclick = () => {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            placeId: place.id
+          }));
+        } else {
+          window.location.href = `draftbit://PlaceDetailsScreen/${place.id}`;
+        }
+      };
+      btnDirections.onclick = () => alert("Directions not implemented yet");
       modal.style.display = "block";
     }
 
@@ -112,9 +139,8 @@
 
         data.forEach(place => {
           if (place.latitude && place.longitude) {
-            L.marker([place.latitude, place.longitude])
-              .addTo(map)
-              .on("click", () => showModal(place));
+            const marker = L.marker([place.latitude, place.longitude]).addTo(map);
+            marker.on("click", () => showModal(place));
           }
         });
       })
