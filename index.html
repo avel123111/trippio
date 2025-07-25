@@ -52,14 +52,11 @@
       font-size: 16px;
       cursor: pointer;
     }
-    #modal button:last-child {
+    #btn-close {
       background: #999;
     }
   </style>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
   <div id="map"></div>
@@ -99,6 +96,7 @@
     function showModal(place) {
       modalImg.src = place.Img_URL || "";
       modalTitle.textContent = place.Name || "Unnamed";
+
       btnTickets.onclick = () => {
         if (place.Ticket_link) {
           window.open(place.Ticket_link, "_blank");
@@ -106,22 +104,27 @@
           alert("No ticket link available.");
         }
       };
+
       btnDetails.onclick = () => {
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
-            placeId: place.id
+            id: place.id
           }));
         } else {
           window.location.href = `draftbit://PlaceDetailsScreen/${place.id}`;
         }
       };
-      btnDirections.onclick = () => alert("Directions not implemented yet");
+
+      btnDirections.onclick = () => {
+        alert("Directions not implemented yet.");
+      };
+
+      btnClose.onclick = () => {
+        modal.style.display = "none";
+      };
+
       modal.style.display = "block";
     }
-
-    btnClose.onclick = () => {
-      modal.style.display = "none";
-    };
 
     fetch(`https://xsu8-fybw-zqnb.e2.xano.io/api:GPLlnBSg/places?city_id=${cityId}`)
       .then(response => {
