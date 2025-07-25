@@ -5,56 +5,23 @@
   <title>Map Viewer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      font-family: sans-serif;
-    }
-    #map {
-      width: 100vw;
-      height: 100vh;
-    }
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
+    #map { width: 100vw; height: 100vh; }
     #modal {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: white;
-      border-top-left-radius: 16px;
-      border-top-right-radius: 16px;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
-      padding: 16px;
-      display: none;
-      z-index: 9999;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: white; border-top-left-radius: 16px; border-top-right-radius: 16px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.3); padding: 16px;
+      display: none; z-index: 9999;
     }
-    #modal img {
-      width: 100%;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      max-height: 200px;
-      object-fit: cover;
-    }
-    #modal h2 {
-      margin: 0 0 12px 0;
-      font-size: 18px;
-    }
+    #modal img { width: 100%; border-radius: 8px; margin-bottom: 12px; max-height: 200px; object-fit: cover; }
+    #modal h2 { margin: 0 0 12px 0; font-size: 18px; }
     #modal button {
-      display: block;
-      width: 100%;
-      margin-top: 8px;
-      padding: 10px;
-      border: none;
-      background: #007bff;
-      color: white;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
+      display: block; width: 100%; margin-top: 8px;
+      padding: 10px; border: none; border-radius: 6px;
+      font-size: 16px; cursor: pointer;
+      background: #007bff; color: white;
     }
-    #btn-close {
-      background: #999;
-    }
+    #btn-close { background: #999; }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
@@ -74,11 +41,7 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const cityId = params.get("city_id");
-
-    if (!cityId) {
-      alert("No city_id provided in URL");
-      throw new Error("Missing city_id");
-    }
+    const routeId = params.get("route_id");
 
     const map = L.map("map").setView([0, 0], 13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -98,20 +61,14 @@
       modalTitle.textContent = place.Name || "Unnamed";
 
       btnTickets.onclick = () => {
-        if (place.Ticket_link) {
-          window.open(place.Ticket_link, "_blank");
-        } else {
-          alert("No ticket link available.");
-        }
+        place.Ticket_link ? window.open(place.Ticket_link, "_blank") : alert("No ticket link available.");
       };
 
       btnDetails.onclick = () => {
         if (window.ReactNativeWebView) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            id: place.id
-          }));
+          window.ReactNativeWebView.postMessage(JSON.stringify({ id: place.id }));
         } else {
-          window.location.href = `untitled-app://PlaceDetailsScreen/${place.id}`;
+          window.location.href = `draftbit://PlaceDetailsScreen/${place.id}`;
         }
       };
 
@@ -126,32 +83,85 @@
       modal.style.display = "block";
     }
 
-    fetch(`https://xsu8-fybw-zqnb.e2.xano.io/api:GPLlnBSg/places?city_id=${cityId}`)
-      .then(response => {
-        if (!response.ok) throw new Error("Ошибка запроса к Xano");
-        return response.json();
-      })
-      .then(data => {
-        if (!Array.isArray(data)) throw new Error("Некорректный ответ от API");
-        if (data.length === 0) {
-          alert("Нет точек для выбранного города.");
-          return;
-        }
+    function addMarker(place) {
+      if (!place.latitude || !place.longitude) return;
+      const marker = L.marker([place.latitude, place.longitude]).addTo(map);
+      marker.on("click", () => showModal(place));
+    }
 
-        const first = data[0];
-        map.setView([first.latitude, first.longitude], 13);
+    function drawRouteLine(coords) {
+      L.polyline(coords, { color: "blue", weight: 4 }).addTo(map);
+    }
 
-        data.forEach(place => {
-          if (place.latitude && place.longitude) {
-            const marker = L.marker([place.latitude, place.longitude]).addTo(map);
-            marker.on("click", () => showModal(place));
+    if (routeId) {
+      fetch(`https://xsu8-fybw-zqnb.e2.xano.io/api:GPLlnBSg/routes/${routeId}`)
+        .then(res => res.json())
+        .then(route => {
+          if (!route.places || route.places.length === 0) {
+            alert("Маршрут пустой.");
+            return;
           }
+
+          const ordered = [...route.places].sort((a, b) => a.point - b.point);
+          const orsCoords = [];
+          const leafletCoords = [];
+
+          ordered.forEach(p => {
+            const place = p._places;
+            if (place.latitude && place.longitude) {
+              orsCoords.push([place.longitude, place.latitude]);      // ORS expects [lon, lat]
+              leafletCoords.push([place.latitude, place.longitude]);  // For markers and map
+              addMarker(place);
+            }
+          });
+
+          map.setView(leafletCoords[0], 14);
+
+          fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
+            method: "POST",
+            headers: {
+              "Authorization": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImU3NzlmZDQyZmNjYzQ3YzA4YTYwNTQ1YjkxMTYyNjg5IiwiaCI6Im11cm11cjY0In0=",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ coordinates: orsCoords })
+          })
+          .then(res => res.json())
+          .then(data => {
+            const geojson = data.features[0].geometry.coordinates;
+            const routeCoords = geojson.map(([lon, lat]) => [lat, lon]);
+            drawRouteLine(routeCoords);
+          })
+          .catch(err => {
+            console.error("Ошибка маршрута ORS:", err);
+            alert("Не удалось построить маршрут.");
+          });
+        })
+        .catch(err => {
+          console.error("Ошибка загрузки маршрута:", err);
+          alert("Не удалось загрузить маршрут.");
         });
-      })
-      .catch(error => {
-        console.error("Ошибка загрузки точек:", error);
-        alert("Не удалось загрузить точки.");
-      });
+
+    } else if (cityId) {
+      fetch(`https://xsu8-fybw-zqnb.e2.xano.io/api:GPLlnBSg/places?city_id=${cityId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!Array.isArray(data) || data.length === 0) {
+            alert("Нет точек для города.");
+            return;
+          }
+
+          const first = data[0];
+          map.setView([first.latitude, first.longitude], 13);
+          data.forEach(addMarker);
+        })
+        .catch(err => {
+          console.error("Ошибка загрузки точек:", err);
+          alert("Не удалось загрузить точки.");
+        });
+
+    } else {
+      alert("Не передан ни city_id, ни route_id.");
+    }
   </script>
 </body>
 </html>
